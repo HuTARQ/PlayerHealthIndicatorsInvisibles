@@ -14,6 +14,8 @@ import net.minecraft.client.texture.GuiAtlasManager;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.ArmorItem;
+import net.minecraft.item.ItemStack;
 import net.minecraft.scoreboard.ScoreboardDisplaySlot;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
@@ -120,10 +122,21 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<Abs
     @Unique
     private static boolean shouldRenderHeartsForEntity(Entity entity) {
         if (entity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
-            return !abstractClientPlayerEntity.isMainPlayer() && !abstractClientPlayerEntity.isInvisibleTo(MinecraftClient.getInstance().player);
+            return !abstractClientPlayerEntity.isMainPlayer() && hasInvisibilityRequirements(abstractClientPlayerEntity);
         }
 
         return false;
+    }
+
+    @Unique
+    private static boolean hasInvisibilityRequirements(AbstractClientPlayerEntity entity) {
+        if (entity.isInvisible()) {
+            for (ItemStack stack : entity.getArmorItems()) {
+                if (stack.getItem() instanceof ArmorItem) return true;
+            }
+            return false;
+        }
+        return true;
     }
 
     @Unique
