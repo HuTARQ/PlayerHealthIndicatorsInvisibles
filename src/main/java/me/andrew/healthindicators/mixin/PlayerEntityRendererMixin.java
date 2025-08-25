@@ -13,9 +13,12 @@ import net.minecraft.client.render.entity.PlayerEntityRenderer;
 import net.minecraft.client.render.entity.model.PlayerEntityModel;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.item.ArmorItem;
+import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -116,10 +119,21 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<Abs
 
     private static boolean shouldRenderHeartsForEntity(Entity entity) {
         if (entity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity) {
-            return !abstractClientPlayerEntity.isMainPlayer() && !abstractClientPlayerEntity.isInvisibleTo(MinecraftClient.getInstance().player);
+            return !abstractClientPlayerEntity.isMainPlayer() && hasInvisibilityRequirements(abstractClientPlayerEntity);
         }
 
         return false;
+    }
+
+    @Unique
+    private static boolean hasInvisibilityRequirements(AbstractClientPlayerEntity entity) {
+        if (entity.isInvisible()) {
+            for (ItemStack stack : entity.getArmorItems()) {
+                if (stack.getItem() instanceof ArmorItem) return true;
+            }
+            return false;
+        }
+        return true;
     }
 
     private static void drawHeart(Matrix4f model, VertexConsumer vertexConsumer, float x, float y, float z, HeartType type){
