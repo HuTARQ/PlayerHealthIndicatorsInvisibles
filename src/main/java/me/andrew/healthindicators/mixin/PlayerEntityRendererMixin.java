@@ -4,16 +4,20 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import me.andrew.healthindicators.Config;
 import me.andrew.healthindicators.HeartType;
 import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.*;
+import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
-import net.minecraft.client.render.entity.PlayerEntityRenderer;
-import net.minecraft.client.render.entity.model.PlayerEntityModel;
+import net.minecraft.client.render.entity.feature.FeatureRendererContext;
+import net.minecraft.client.render.entity.model.EntityModel;
+import net.minecraft.client.render.entity.state.LivingEntityRenderState;
 import net.minecraft.client.texture.GuiAtlasManager;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ArmorItem;
 import net.minecraft.item.ItemStack;
 import net.minecraft.scoreboard.ScoreboardDisplaySlot;
@@ -25,17 +29,37 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(PlayerEntityRenderer.class)
-public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<AbstractClientPlayerEntity, PlayerEntityModel<AbstractClientPlayerEntity>> {
-    public PlayerEntityRendererMixin(EntityRendererFactory.Context ctx, PlayerEntityModel<AbstractClientPlayerEntity> model, float shadowRadius) {
-        super(ctx, model, shadowRadius);
+import java.util.WeakHashMap;
+
+@Mixin(LivingEntityRenderer.class)
+public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extends LivingEntityRenderState, M extends EntityModel<? super S>> extends EntityRenderer<T, S> implements FeatureRendererContext<S, M> {
+
+    @Unique @SuppressWarnings("ALL") WeakHashMap<LivingEntityRenderState, LivingEntity> entities = new WeakHashMap<>();
+
+    public PlayerEntityRendererMixin(EntityRendererFactory.Context ctx) {
+        super(ctx);
     }
 
     @Inject(
-            method = "render(Lnet/minecraft/client/network/AbstractClientPlayerEntity;FFLnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
+            method = "updateRenderState(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/client/render/entity/state/LivingEntityRenderState;F)V",
+            at = @At("TAIL")
+    )
+    public void updateRenderStateInject(T livingEntity, S livingEntityRenderState, float f, CallbackInfo ci) {
+        entities.put(livingEntityRenderState, livingEntity);
+    }
+
+
+    @Inject(
+            method = "render(Lnet/minecraft/client/render/entity/state/LivingEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
             at = @At("RETURN")
     )
-    public void renderHealth(AbstractClientPlayerEntity abstractClientPlayerEntity, float f, float g, MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, int light, CallbackInfo ci) {
+
+    public void renderHealth(S livingEntityRenderState, MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, int i, CallbackInfo ci) {
+
+        LivingEntity livingEntity = entities.get(livingEntityRenderState);
+
+        if (!(livingEntity instanceof AbstractClientPlayerEntity abstractClientPlayerEntity)) return;
+
         if (!Config.getRenderingEnabled()) return;
 
         if (!shouldRenderHeartsForEntity(abstractClientPlayerEntity)) return;
@@ -45,7 +69,10 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<Abs
         double d = this.dispatcher.getSquaredDistanceToCamera(abstractClientPlayerEntity);
 
         matrixStack.translate(0, abstractClientPlayerEntity.getHeight() + 0.5f, 0);
-        if (this.hasLabel(abstractClientPlayerEntity) && d <= 4096.0) {
+
+        T TEntity = (T) abstractClientPlayerEntity;
+
+        if (this.hasLabel(TEntity, d) && d <= 4096.0) {
             matrixStack.translate(0.0D, 9.0F * 1.15F * 0.025F, 0.0D);
             if (d < 100.0 && abstractClientPlayerEntity.getScoreboard().getObjectiveForSlot(ScoreboardDisplaySlot.BELOW_NAME) != null) {
                 matrixStack.translate(0.0D, 9.0F * 1.15F * 0.025F, 0.0D);
@@ -62,7 +89,7 @@ public abstract class PlayerEntityRendererMixin extends LivingEntityRenderer<Abs
 
         GuiAtlasManager guiAtlasManager = MinecraftClient.getInstance().getGuiAtlasManager();
 
-        RenderSystem.setShader(GameRenderer::getPositionTexProgram);
+        RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
         RenderSystem.setShaderTexture(0, guiAtlasManager.getSprite(HeartType.EMPTY.texture).getAtlasId());
         RenderSystem.enableDepthTest();
         BufferBuilder vertexConsumer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);

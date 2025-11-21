@@ -6,7 +6,8 @@
   "name": "PlayerHealthIndicators",
   "description": "Displays a health bar above players",
   "authors": [
-    "Gaider10"
+    "Gaider10",
+    "HuTAR"
   ],
 
   "license": "MIT",
@@ -23,7 +24,7 @@
 
   "depends": {
     "fabricloader": ">=0.15.11",
-    "minecraft": "~1.21",
+    "minecraft": ">=1.21.2",
     "java": ">=21",
     "fabric-api": "*"
   }
