@@ -1,10 +1,8 @@
 package me.andrew.healthindicators.mixin;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import me.andrew.healthindicators.Config;
 import me.andrew.healthindicators.HeartType;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gl.ShaderProgramKeys;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.*;
 import net.minecraft.client.render.entity.EntityRenderer;
@@ -16,9 +14,11 @@ import net.minecraft.client.render.entity.state.LivingEntityRenderState;
 import net.minecraft.client.texture.GuiAtlasManager;
 import net.minecraft.client.texture.Sprite;
 import net.minecraft.client.util.math.MatrixStack;
+import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.item.ArmorItem;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.scoreboard.ScoreboardDisplaySlot;
 import net.minecraft.util.math.MathHelper;
@@ -29,6 +29,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
+import java.util.List;
 import java.util.WeakHashMap;
 
 @Mixin(LivingEntityRenderer.class)
@@ -89,10 +90,10 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
 
         GuiAtlasManager guiAtlasManager = MinecraftClient.getInstance().getGuiAtlasManager();
 
-        RenderSystem.setShader(ShaderProgramKeys.POSITION_TEX);
-        RenderSystem.setShaderTexture(0, guiAtlasManager.getSprite(HeartType.EMPTY.texture).getAtlasId());
-        RenderSystem.enableDepthTest();
-        BufferBuilder vertexConsumer = Tessellator.getInstance().begin(VertexFormat.DrawMode.QUADS, VertexFormats.POSITION_TEXTURE);
+        Sprite sprite = guiAtlasManager.getSprite(HeartType.EMPTY.texture);
+        VertexConsumer vertexConsumer =
+                vertexConsumerProvider.getBuffer(RenderLayer.getGuiTextured(sprite.getAtlasId()));
+
 
         Matrix4f model = matrixStack.peek().getPositionMatrix();
 
@@ -140,9 +141,6 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
                 drawHeart(model, vertexConsumer, x, y, z, type, guiAtlasManager);
             }
         }
-
-        BufferRenderer.drawWithGlobalProgram(vertexConsumer.end());
-
         matrixStack.pop();
     }
 
@@ -156,10 +154,17 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
     }
 
     @Unique
-    private static boolean hasInvisibilityRequirements(AbstractClientPlayerEntity entity) {
+    private static boolean hasInvisibilityRequirements(PlayerEntity entity) {
+        List<EquipmentSlot> armorSlots = List.of(
+                EquipmentSlot.HEAD,
+                EquipmentSlot.CHEST,
+                EquipmentSlot.LEGS,
+                EquipmentSlot.FEET
+        );
         if (entity.isInvisible()) {
-            for (ItemStack stack : entity.getArmorItems()) {
-                if (stack.getItem() instanceof ArmorItem) return true;
+            for (EquipmentSlot eSlot : armorSlots) {
+                ItemStack stack = entity.getEquippedStack(eSlot);
+                if (stack.contains(DataComponentTypes.EQUIPPABLE)) return true;
             }
             return false;
         }
@@ -185,6 +190,6 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
 
     @Unique
     private static void drawVertex(Matrix4f model, VertexConsumer vertices, float x, float y, float z, float u, float v) {
-        vertices.vertex(model, x, y, z).texture(u, v);
+        vertices.vertex(model, x, y, z).texture(u, v).color(255, 255, 255, 255);
     }
 }
