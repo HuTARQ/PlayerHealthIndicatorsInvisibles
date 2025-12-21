@@ -91,9 +91,7 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
         GuiAtlasManager guiAtlasManager = MinecraftClient.getInstance().getGuiAtlasManager();
 
         Sprite sprite = guiAtlasManager.getSprite(HeartType.EMPTY.texture);
-        VertexConsumer vertexConsumer =
-                vertexConsumerProvider.getBuffer(RenderLayer.getGuiTextured(sprite.getAtlasId()));
-
+        VertexConsumer vertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getText(sprite.getAtlasId()));
 
         Matrix4f model = matrixStack.peek().getPositionMatrix();
 
@@ -190,6 +188,6 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
 
     @Unique
     private static void drawVertex(Matrix4f model, VertexConsumer vertices, float x, float y, float z, float u, float v) {
-        vertices.vertex(model, x, y, z).texture(u, v).color(255, 255, 255, 255);
+        vertices.vertex(model, x, y, z).texture(u, v).color(255, 255, 255, 255).light(15728880);
     }
 }
