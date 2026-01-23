@@ -5,14 +5,15 @@ import me.andrew.healthindicators.HeartType;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.network.AbstractClientPlayerEntity;
 import net.minecraft.client.render.*;
+import net.minecraft.client.render.command.OrderedRenderCommandQueue;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.LivingEntityRenderer;
 import net.minecraft.client.render.entity.feature.FeatureRendererContext;
 import net.minecraft.client.render.entity.model.EntityModel;
 import net.minecraft.client.render.entity.state.LivingEntityRenderState;
-import net.minecraft.client.texture.GuiAtlasManager;
-import net.minecraft.client.texture.Sprite;
+import net.minecraft.client.render.state.CameraRenderState;
+import net.minecraft.client.texture.*;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.entity.Entity;
@@ -21,6 +22,8 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.scoreboard.ScoreboardDisplaySlot;
+import net.minecraft.util.Atlases;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import org.joml.Matrix4f;
 import org.spongepowered.asm.mixin.Mixin;
@@ -51,11 +54,11 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
 
 
     @Inject(
-            method = "render(Lnet/minecraft/client/render/entity/state/LivingEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/VertexConsumerProvider;I)V",
+            method = "render(Lnet/minecraft/client/render/entity/state/LivingEntityRenderState;Lnet/minecraft/client/util/math/MatrixStack;Lnet/minecraft/client/render/command/OrderedRenderCommandQueue;Lnet/minecraft/client/render/state/CameraRenderState;)V",
             at = @At("RETURN")
     )
-
-    public void renderHealth(S livingEntityRenderState, MatrixStack matrixStack, VertexConsumerProvider vertexConsumerProvider, int i, CallbackInfo ci) {
+    @SuppressWarnings("unchecked")
+    public void renderHealth(S livingEntityRenderState, MatrixStack matrixStack, OrderedRenderCommandQueue orderedRenderCommandQueue, CameraRenderState cameraRenderState, CallbackInfo ci) {
 
         LivingEntity livingEntity = entities.get(livingEntityRenderState);
 
@@ -75,25 +78,20 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
 
         if (this.hasLabel(TEntity, d) && d <= 4096.0) {
             matrixStack.translate(0.0D, 9.0F * 1.15F * 0.025F, 0.0D);
-            if (d < 100.0 && abstractClientPlayerEntity.getScoreboard().getObjectiveForSlot(ScoreboardDisplaySlot.BELOW_NAME) != null) {
+            if (d < 100.0 && abstractClientPlayerEntity.getEntityWorld().getScoreboard().getObjectiveForSlot(ScoreboardDisplaySlot.BELOW_NAME) != null) {
                 matrixStack.translate(0.0D, 9.0F * 1.15F * 0.025F, 0.0D);
             }
         }
 
-        matrixStack.multiply(this.dispatcher.getRotation());
-//            matrixStack.multiply(Vector3f.POSITIVE_X.getDegreesQuaternion(mc.gameRenderer.getCamera().getPitch()));
+        if (this.dispatcher.camera == null) return;
+        matrixStack.multiply(this.dispatcher.camera.getRotation());
         matrixStack.scale(-1, 1, 1);
 
         float pixelSize = 0.025F;
         matrixStack.scale(pixelSize, pixelSize, pixelSize);
         matrixStack.translate(0, Config.getHeartOffset(), 0);
 
-        GuiAtlasManager guiAtlasManager = MinecraftClient.getInstance().getGuiAtlasManager();
-
-        Sprite sprite = guiAtlasManager.getSprite(HeartType.EMPTY.texture);
-        VertexConsumer vertexConsumer = vertexConsumerProvider.getBuffer(RenderLayer.getText(sprite.getAtlasId()));
-
-        Matrix4f model = matrixStack.peek().getPositionMatrix();
+        AtlasManager guiAtlasManager = MinecraftClient.getInstance().getAtlasManager();
 
         int healthRed = MathHelper.ceil(abstractClientPlayerEntity.getHealth());
         int maxHealth = MathHelper.ceil(abstractClientPlayerEntity.getMaxHealth());
@@ -119,7 +117,7 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
             float x = maxX - col * 8;
             float y = row * rowOffset;
             float z = row * 0.01F;
-            drawHeart(model, vertexConsumer, x, y, z, HeartType.EMPTY, guiAtlasManager);
+            drawHeart(matrixStack, x, y, z, HeartType.EMPTY, guiAtlasManager);
 
             HeartType type;
             if (heart < heartsRed) {
@@ -136,7 +134,7 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
                 }
             }
             if (type != HeartType.EMPTY) {
-                drawHeart(model, vertexConsumer, x, y, z, type, guiAtlasManager);
+                drawHeart(matrixStack, x, y, z, type, guiAtlasManager);
             }
         }
         matrixStack.pop();
@@ -170,24 +168,43 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
     }
 
     @Unique
-    private static void drawHeart(Matrix4f model, VertexConsumer vertexConsumer, float x, float y, float z, HeartType type, GuiAtlasManager guiAtlasManager){
-        Sprite sprite = guiAtlasManager.getSprite(type.texture);
+    private static void drawHeart(
+            MatrixStack matrices,
+            float x, float y, float z,
+            HeartType type,
+            AtlasManager guiAtlasManager     // = MinecraftClient.getInstance().getGuiAtlasManager()
+    ) {
+        Sprite sprite = guiAtlasManager.getAtlasTexture(Atlases.GUI).getSprite(type.texture);
 
         float minU = sprite.getMinU();
         float maxU = sprite.getMaxU();
         float minV = sprite.getMinV();
         float maxV = sprite.getMaxV();
 
-        float heartSize = 9F;
+        float heartSize = 9.0f;
+
+        matrices.push();
+
+        Matrix4f model = matrices.peek().getPositionMatrix();
+
+        Identifier atlasTexture = Identifier.ofVanilla("textures/atlas/gui.png");
+        VertexConsumer vertexConsumer = sprite.getTextureSpecificVertexConsumer(
+                MinecraftClient.getInstance()
+                        .getBufferBuilders()
+                        .getEntityVertexConsumers()
+                        .getBuffer(RenderLayer.getEntityTranslucent(atlasTexture))
+        );
 
         drawVertex(model, vertexConsumer, x, y - heartSize, z, minU, maxV);
         drawVertex(model, vertexConsumer, x - heartSize, y - heartSize, z, maxU, maxV);
         drawVertex(model, vertexConsumer, x - heartSize, y, z, maxU, minV);
         drawVertex(model, vertexConsumer, x, y, z, minU, minV);
+
+        matrices.pop();
     }
 
     @Unique
     private static void drawVertex(Matrix4f model, VertexConsumer vertices, float x, float y, float z, float u, float v) {
-        vertices.vertex(model, x, y, z).texture(u, v).color(255, 255, 255, 255).light(15728880);
+        vertices.vertex(model, x, y, z).texture(u, v).color(255, 255, 255, 255).light(15728880).overlay(OverlayTexture.DEFAULT_UV).normal(0, 1, 0);
     }
 }

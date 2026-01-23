@@ -6,31 +6,33 @@ import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.option.KeyBinding;
 import net.minecraft.client.util.InputUtil;
 import net.minecraft.text.Text;
+import net.minecraft.util.Identifier;
 
 public class HealthIndicatorsMod implements ModInitializer {
     public static final String MOD_ID = "healthindicators";
+    public static KeyBinding.Category KeybindingCategory = KeyBinding.Category.create(Identifier.of(MOD_ID));
 
     public static final String CONFIG_FILE = "healthindicators.json";
 
     public static final KeyBinding RENDERING_ENABLED_KEY_BINDING = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key." + MOD_ID + ".renderingEnabled",
             InputUtil.UNKNOWN_KEY.getCode(),
-            "key.categories." + MOD_ID
+            KeybindingCategory
     ));
     public static final KeyBinding HEART_STACKING_ENABLED_KEY_BINDING = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key." + MOD_ID + ".heartStackingEnabled",
             InputUtil.UNKNOWN_KEY.getCode(),
-            "key.categories." + MOD_ID
+            KeybindingCategory
     ));
     public static final KeyBinding INCREASE_HEART_OFFSET_KEY_BINDING = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key." + MOD_ID + ".increaseHeartOffset",
             InputUtil.UNKNOWN_KEY.getCode(),
-            "key.categories." + MOD_ID
+            KeybindingCategory
     ));
     public static final KeyBinding DECREASE_HEART_OFFSET_KEY_BINDING = KeyBindingHelper.registerKeyBinding(new KeyBinding(
             "key." + MOD_ID + ".decreaseHeartOffset",
             InputUtil.UNKNOWN_KEY.getCode(),
-            "key.categories." + MOD_ID
+            KeybindingCategory
     ));
 
     @Override

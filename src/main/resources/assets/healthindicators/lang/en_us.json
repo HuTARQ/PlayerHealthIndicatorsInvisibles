@@ -1,5 +1,5 @@
 {
-  "key.categories.healthindicators": "Player Health Indicators",
+  "key.category.minecraft.healthindicators": "Player Health Indicators",
   "key.healthindicators.renderingEnabled": "Toggle Rendering",
   "key.healthindicators.heartStackingEnabled": "Toggle Heart Stacking",
   "key.healthindicators.increaseHeartOffset": "Increase Heart Offset",
