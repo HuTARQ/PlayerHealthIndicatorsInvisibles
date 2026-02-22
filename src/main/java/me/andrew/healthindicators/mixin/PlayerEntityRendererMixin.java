@@ -192,7 +192,7 @@ public abstract class PlayerEntityRendererMixin<T extends LivingEntity, S extend
                 MinecraftClient.getInstance()
                         .getBufferBuilders()
                         .getEntityVertexConsumers()
-                        .getBuffer(RenderLayer.getEntityTranslucent(atlasTexture))
+                        .getBuffer(RenderLayers.entityCutoutNoCull(atlasTexture))
         );
 
         drawVertex(model, vertexConsumer, x, y - heartSize, z, minU, maxV);
